@@ -1,0 +1,126 @@
+PIG
+
+] pig  -- pig will open in map-reduce mode
+grunt>
+grunt>quit
+]pig -x mapred (same as ]pig, will take to mr or distbd mode)
+grunt> quit
+] pig -x local  # pig will open in local mode
+
+SEPARATING WORDS FROM LINES
+file = load 'abc.txt' using PigStorage() as (lines:chararray);
+word = foreach file generate FLATTEN(TOKENIZE(lines)) as words;
+dump word;
+
+
+MAPREDUCE MODE
+
+]pig
+books = LOAD 'books' as (name:chararray,user:chararray);
+or books = laod 'books' using PigStorage('\t') as (name:chararray,user:chararray);
+ILLUSTRATE BOOKS;
+book_grp = GROUP books by name;
+books_cnt = foreach books_grp generate group, COUNT (books) as cnt;
+sorted = ORDER books_cnt by cnt desc;
+dump sorted;
+
+LOCAL MODE
+	
+(files are in hdfs so copy into local)
+]hdfs fs -get 'cust_ind'
+]hdfs fs -get "cust_us'  (]hdfs fs -get cust_ind .)
+
+
+]ls -lrth
+]pig -x local
+grunt> ind = LOAD 'cust_ind' Using PigStorage (',') AS (name:chararray,city:chararray,rating:int);
+grunt> usa = LOAD 'cust_us' Using PigStorage (',') AS (name:chararray,city:chararray,rating:int);
+grunt> total_cust = UNION ind, usa;
+grunt> SPLIT total_cust INTO goodcust IF rating>5, badcust OTHERWISE;
+grunt> STORE goodcust INTO 'goodcustomers';
+grunt> STORE badcust INTO 'badcustomers';
+grunt> quit;
+]ls -lrth
+] cd GOODCUST
+GOODCUST] ll
+(part-m-00000, part-m-00001, _SUCCESS)
+] cat part-m-00000 (o/p is IND cust with >5 rating)
+] cat part-m-00001 (o/p is USA cust with >5 rating)
+
+] cd BADCUST
+BADCUST] ll
+(part-m-00000, part-m-00001, _SUCCESS)
+] cat part-m-00000 (o/p is IND cust with <5 rating)
+] cat part-m-00001 (o/p is USA cust with <5 rating)
+
+
+NEW PROBLEM fruits.txt
+copy file from hdfs to local
+]hadoop fs -get fruits.txt .
+]pig -x local
+grunt> file = LOAD 'fruits.txt' AS (line:chararray);
+grunt> illustrate file;
+grunt> wordsarray = FOREACH file GENERATE TOKENIZE(line);
+(to separate each word in the line use TOKENIZE)
+grunt> words = foreach wordsarray generate flatten($0) as word:chararray;
+($0 - is index of column, if difficult name of col then use it,
+if next col it will be $1)
+grunt> wordsGrp = Group words by word;
+wordsCount = foreach wordsGrp generate group, COUNT (words) as cnt;
+wordsSorted = ORDER wordsCount by cnt desc;
+-- DUMP wordsSorted;
+store wordsSorted into 'word_count';
+
+RESULT
+(mango,49)
+(orange,46)
+(banana,45)
+(apple,40)
+(grapes,32)
+(cherry,16)
+
+GROUPING TWO VARIABLES AND FINDING MAX AMOUNT
+Find max amt spent per user on a given product and city	
+
+transactions.txt
+TXN_ID,TXN_DATE,USER_ID,AMOUNT,PRODUCT,CITY,PAYMENT_MODE
+
+txns = load 'transactions.txt' Using PigStorage(',') AS (TXN_ID:int,TXN_DATE:chararray,USER_ID:int,AMOUNT:int,PRODUCT:chararray,CITY:chararray,PAYMENT_MODE:chararray)
+txngrp = GROUP txns BY (CITY,PRODUCT);
+txnAmountMax = FOREACH  txngrp GENERATE group, MAX( txns.AMOUNT);
+
+combining, splitting and joining relations
+grunt> custind= LOAD 'cust_ind' USING PigStorage(',') AS (username:chararray,city:chararray,rating:int);
+grunt> illustrate custind;
+grunt> cust_tot = UNION custind, custusa;
+grunt> STORE cust_tot INTO 'cust_tot';
+( after executing look for Success! )
+] hdfs dfs -cat cust_tot/part-m-00000
+(shows details)
+
+grunt> student_details = LOAD 'student_details.txt' USING PigStorage(',') AS (id:int,firstname:chararray, lastname:chararray, age:int, phon
+e:chararray, city:chararray);
+> SPLIT student_details INTO student_details1 if age<23, student_details2 if age>22;
+> store student_details1 into 'student_details1';
+> store student_details2 into 'student_details2';
+
+
+# write the commands in a file and running the script
+] pig -x local books.pig  # run in local mode
+] pig books.pig # run in mr mode
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
