@@ -1,0 +1,101 @@
+HADOOP PROJECT SOCIAL MEDIA
+problems to be solved
+(1) Top 10 most commonly used tags in this data set.
+(2) Average time to answer questions.
+(3) Number of questions which got answered within 1 hour.
+(4) Tags of questions which got answered within 1 hour.
+
+-- Link for dataset
+-- http://www.ics.uci.edu/~duboisc/stackoverflow/answers.csv
+
+load data from local to HDFS
+] hadoop fs -put 'answers.txt' .
+
+load data from HDFS to local
+] hadoop fs -get 'answers.txt' .
+
+moving to pig local mode
+] pig -x local
+
+loading data answers.txt in grunt shell or pig
+grunt> data = load 'pig_all/answers.txt' Using PigStorage('_') AS (qid:chararray,c2:chararray,c3:chararray,qt:int,tags:chararray,c6:chararray,c7:chararray,c8:chararray,c9:chararray,c10:chararray,at:int);
+
+
+Problem 1: Top 10 most commonly used tags in this data set
+
+> data_tags = foreach data generate tags;
+> data_token = foreach data_tags generate TOKENIZE(tags);
+> data_flat = foreach data_token generate FLATTEN($0) AS tag:chararray;
+> data_group = GROUP data_flat by tag;
+> illustrate data_group
+> data_count = foreach data_group generate group,COUNT(data_flat) AS cnt;
+> data_sort = ORDER data_count by cnt desc;
+> data_top10_tags = LIMIT data_sort 10;
+> DUMP data_top10_tags;
+
+
+
+Problem 2_A: Average time to answer all questions
+
+> data1 = foreach data generate at-qt AS tt:int;
+> tt_group = GROUP data1 ALL;
+> tt_avg = foreach tt_group generate SUM($1), COUNT($1), AVG($1);
+> DUMP tt_avg;
+
+Problem 2_B: Average time to answer each question
+
+data1 = foreach data generate qid, at-qt AS tt:int;
+data_grp = group data1 by qid;
+data_avg = foreach data_grp generate group, SUM(data1.tt), COUNT(data1.tt) , AVG(data1.tt) as avg_sec;
+dump data_avg
+
+
+Problem 3: Number of questions which got answered within 1 hour
+
+> time_col = foreach data generate qid, at-qt AS tt:int;
+> time_group = GROUP time_col by qid;
+> time_max = foreach time_group generate (time_col.qid), MAX(time_col.tt) AS maxtime:int;
+> time_1hr = FILTER time_max by maxtime < 3600;
+> datagrp = foreach time_1hr generate maxtime;
+> datagroup = GROUP datagrp ALL;
+> datacount = foreach datagroup generate COUNT(datagrp);
+> DUMP datacount;
+
+
+
+Problem 4(a): Count (total number) of tags that was answered within an hour
+
+> data2 = foreach data generate tags,at-qt AS tt:int;
+> data_token = foreach data2 generate TOKENIZE(tags), tt;
+> data_flat = foreach data_token generate FLATTEN($0) AS tag:chararray, tt;
+> data_grp = GROUP data_flat by tag;
+> data_maxtime = foreach data_grp generate (data_flat.tag),MAX(data_flat.tt) AS maxtime:int;
+> tags_1hr = FILTER data_maxtime by maxtime<3600;
+> tags_1hrgroup = GROUP tags_1hr ALL;
+> tags_1hrcount = foreach tags_1hrgroup generate COUNT(tags_1hr);
+> DUMP tags_1hrcount;
+
+
+
+Problem 4(b): Name of every tag that was answered within an hour
+
+> data2 = foreach data generate tags,at-qt AS tt:int;
+> data_token = foreach data2 generate TOKENIZE(tags), tt;
+> data_flat = foreach data_token generate FLATTEN($0) AS tag:chararray, tt;
+> data_grp = GROUP data_flat by tag;
+> data_maxtime = foreach data_grp generate group, (data_flat.tag),MAX(data_flat.tt) AS maxtime:int;
+> tags_1hr = FILTER data_maxtime by maxtime<3600;
+> tags_1hrgroup = foreach tags_1hr generate group, maxtime;
+> STORE tags_1hrgroup INTO 'tags_1hrgroup';
+
+
+
+Problem 4(c): Name of each group of tags that was answered within an hour
+
+> data2 = foreach data generate tags,at-qt AS tt:int;
+> data_grp = GROUP data2 by tags;
+> data_max = foreach data_grp generate group, (data2.tags), MAX(data2.tt) AS maxtime:int;
+> data_1hr = FILTER data_max by maxtime<3600;
+> data_1hr_tags = foreach data_1hr generate group, maxtime;
+> STORE data_1hr_tags INTO 'data_tags_1hr';
+ 
